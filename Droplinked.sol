@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity >=0.8<0.9;
+pragma solidity >=0.8.4<0.9;
 
 contract simpleStorage {
+    error NotApprovedSign(); 
+    error OldPrice(); 
+    
     event Mint(uint token_id, address recipient, uint amount, uint balance);
     event PulishRequest(uint token_id, uint amount, uint request_id);
     event AcceptRequest(uint request_id);
     event CancelRequest(uint request_id);
     event DisapproveRequest(uint request_id, uint amount, uint token_id);
-
+    
     struct NFTMetadata {
         string name;
         string ipfsUrl;
@@ -26,7 +29,7 @@ contract simpleStorage {
     uint public total_supply;
     address public ratioVerifier;
     uint public fee;
-    
+
     mapping (address => mapping(uint => uint)) public holders;
     mapping (uint => NFTMetadata) public metadatas;
     mapping (uint => Request) public requests;
@@ -106,10 +109,25 @@ contract simpleStorage {
         }
     }
 
-    function direct_buy(uint token_id, uint amount) public {
-        
+
+    function direct_buy(uint price, uint ratio, uint _blockHeight, address recipient, uint8 _v, bytes32 _r, bytes32 _s) public payable {
+        if(block.number>_blockHeight+10){
+             revert OldPrice();
+        }
+        bytes32 _hashedMessage = keccak256(abi.encodePacked(ratio,_blockHeight));
+        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+        bytes32 prefixedHashMessage = keccak256(abi.encodePacked(prefix, _hashedMessage));
+        address signer = ecrecover(prefixedHashMessage, _v, _r, _s);
+        if (signer != ratioVerifier) {
+            revert NotApprovedSign();
+        }
+        payable(recipient).transfer(((price*ratio) / 100) * 1000000000000000000);
     }
     
+    function buy_recorded(uint token_id, uint amount) public {
+        
+    }
+
     function buy_affiliate(uint request_id, uint amount) public {
         
     }
